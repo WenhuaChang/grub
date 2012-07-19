@@ -26,6 +26,12 @@ datarootdir="@datarootdir@"
 export TEXTDOMAIN=@PACKAGE@
 export TEXTDOMAINDIR="@localedir@"
 
+if [ ! -e /proc/xen/xsd_port -a -e /proc/xen ]; then
+# we're running on xen domU guest
+# prevent setting up nested virt on HVM or PV domU guest
+    exit 0
+fi
+
 CLASS="--class gnu-linux --class gnu --class os --class xen"
 
 if [ "x${GRUB_DISTRIBUTOR}" = "x" ] ; then
@@ -210,10 +216,18 @@ file_is_not_xen_garbage () {
     esac
 }
 
-xen_list=
-for i in /boot/xen*; do
-    if grub_file_is_not_garbage "$i" && file_is_not_xen_garbage "$i" ; then xen_list="$xen_list $i" ; fi
-done
+# bnc#877040 - Duplicate entries for boot menu created
+# only create /boot/xen.gz symlink boot entry
+if test -L /boot/xen.gz; then
+    xen_list=`readlink -f /boot/xen.gz`
+else
+    # bnc#757895 - Grub2 menu items incorrect when "Xen Virtual Machines Host Server" selected
+    # wildcard expasion with correct suffix (.gz) for not generating many duplicated menu entries
+    xen_list=
+    for i in /boot/xen*.gz; do
+	if grub_file_is_not_garbage "$i" && file_is_not_sym "$i" ; then xen_list="$xen_list $i" ; fi
+    done
+fi
 prepare_boot_cache=
 boot_device_id=
 
