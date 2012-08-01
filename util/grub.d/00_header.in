@@ -304,7 +304,9 @@ make_timeout ()
 	style="menu"
     fi
     cat << EOF
-if [ x\$feature_timeout_style = xy ] ; then
+if [ x\${boot_once} = xtrue ]; then
+  set timeout=0
+elif [ x\$feature_timeout_style = xy ] ; then
   set timeout_style=${style}
   set timeout=${timeout}
 EOF
