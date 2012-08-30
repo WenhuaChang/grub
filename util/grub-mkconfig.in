@@ -131,14 +131,27 @@ else
     exit 1
 fi
 
-# Device containing our userland.  Typically used for root= parameter.
-GRUB_DEVICE="`${grub_probe} --target=device /`"
-GRUB_DEVICE_UUID="`${grub_probe} --device ${GRUB_DEVICE} --target=fs_uuid 2> /dev/null`" || true
-GRUB_DEVICE_PARTUUID="`${grub_probe} --device ${GRUB_DEVICE} --target=partuuid 2> /dev/null`" || true
+probe_nfsroot_device () {
+    while read line ; do
+        part1=`echo $line | sed -e 's! - .*$!!'`
+        part2=`echo $line | sed -n -e 's! - \(.*\)$!\n\1!p' | sed 1d`
 
-# Device containing our /boot partition.  Usually the same as GRUB_DEVICE.
-GRUB_DEVICE_BOOT="`${grub_probe} --target=device /boot`"
-GRUB_DEVICE_BOOT_UUID="`${grub_probe} --device ${GRUB_DEVICE_BOOT} --target=fs_uuid 2> /dev/null`" || true
+        set -- $part1
+        path=$5
+
+        set -- $part2
+        fstype=$1
+        device=$2
+
+        if [ "x${path}" = "x/" ] &&
+           [ "x${fstype}" = "xnfs" -o "x${fstype}" = "xnfs4" ] ; then
+            echo "${fstype}:$device"
+            return
+        fi
+    done
+}
+
+NFSROOT_DEVICE="`awk '($9!="autofs")&&($9!="securityfs")' /proc/self/mountinfo | probe_nfsroot_device`"
 
 # Disable os-prober by default due to security reasons.
 GRUB_DISABLE_OS_PROBER="true"
@@ -146,10 +159,25 @@ GRUB_DISABLE_OS_PROBER="true"
 # Filesystem for the device containing our userland.  Used for stuff like
 # choosing Hurd filesystem module.
 GRUB_FS="`${grub_probe} --device ${GRUB_DEVICE} --target=fs 2> /dev/null || echo unknown`"
+if [ "x${NFSROOT_DEVICE}" != "x" ]; then
+    GRUB_DEVICE=""
+    GRUB_DEVICE_UUID=""
+    GRUB_DEVICE_PARTUUID=""
+    GRUB_FS="unknown"
+else
+    # Device containing our userland.  Typically used for root= parameter.
+    GRUB_DEVICE="`${grub_probe} --target=device /`"
+    GRUB_DEVICE_UUID="`${grub_probe} --device ${GRUB_DEVICE} --target=fs_uuid 2> /dev/null`" || true
+    GRUB_DEVICE_PARTUUID="`${grub_probe} --device ${GRUB_DEVICE} --target=partuuid 2> /dev/null`" || true
 
-if [ x"$GRUB_FS" = xunknown ]; then
-    GRUB_FS="$(stat -f -c %T / || echo unknown)"
+    if [ x"$GRUB_FS" = x ] || [ x"$GRUB_FS" = xunknown ]; then
+	GRUB_FS="$(stat -f -c %T / || echo unknown)"
+    fi
 fi
+
+# Device containing our /boot partition.  Usually the same as GRUB_DEVICE.
+GRUB_DEVICE_BOOT="`${grub_probe} --target=device /boot`"
+GRUB_DEVICE_BOOT_UUID="`${grub_probe} --device ${GRUB_DEVICE_BOOT} --target=fs_uuid 2> /dev/null`" || true
 
 # Provide a default set of stock linux early initrd images.
 # Define here so the list can be modified in the sourced config file.

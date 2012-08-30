@@ -107,6 +107,11 @@ linux_entry_xsm ()
   args="$5"
   xen_args="$6"
   xsm="$7"
+  if [ -n "${linux_root_device_thisversion}" ]; then
+    root_device="root=${linux_root_device_thisversion}"
+  else
+    root_device=""
+  fi
   # If user wants to enable XSM support, make sure there's
   # corresponding policy file.
   if ${xsm} ; then
@@ -157,7 +162,7 @@ linux_entry_xsm ()
         fi
 	${xen_loader}	${rel_xen_dirname}/${xen_basename} placeholder ${xen_args} \${xen_rm_opts}
 	echo	'$(echo "$lmessage" | grub_quote)'
-	${module_loader}	${rel_dirname}/${basename} placeholder root=${linux_root_device_thisversion} ${args}
+	${module_loader}	${rel_dirname}/${basename} placeholder ${root_device} ${args}
 EOF
   if test -n "${initrd}" ; then
     # TRANSLATORS: ramdisk isn't identifier. Should be translated.
