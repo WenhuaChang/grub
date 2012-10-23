@@ -38,6 +38,10 @@
 #define GRUB_MODULES_MACHINE_READONLY
 #endif
 
+#ifdef GRUB_MACHINE_EFI
+#include <grub/efi/sb.h>
+#endif
+
 
 
 #pragma GCC diagnostic ignored "-Wcast-align"
@@ -696,6 +700,19 @@ grub_dl_load_file (const char *filename)
   grub_dl_t mod = 0;
 
   grub_boot_time ("Loading module %s", filename);
+
+#ifdef GRUB_MACHINE_EFI
+  if (grub_efi_get_secureboot () == GRUB_EFI_SECUREBOOT_MODE_ENABLED)
+    {
+#if 0
+      /* This is an error, but grub2-mkconfig still generates a pile of
+       * insmod commands, so emitting it would be mostly just obnoxious. */
+      grub_error (GRUB_ERR_ACCESS_DENIED,
+		  "Secure Boot forbids loading module from %s", filename);
+#endif
+      return 0;
+    }
+#endif
 
   file = grub_file_open (filename, GRUB_FILE_TYPE_GRUB_MODULE);
   if (! file)
