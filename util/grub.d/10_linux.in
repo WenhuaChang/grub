@@ -145,7 +145,7 @@ linux_entry ()
     printf '%s\n' "${prepare_boot_cache}" | sed "s/^/$submenu_indentation/"
   fi
   message="$(gettext_printf "Loading Linux %s ..." ${version})"
-  if [ -d /sys/firmware/efi ]; then
+  if [ -d /sys/firmware/efi ] && [ "x${GRUB_USE_LINUXEFI}" = "xtrue" ]; then
     sed "s/^/$submenu_indentation/" << EOF
 	echo	'$(echo "$message" | grub_quote)'
 	linuxefi ${rel_dirname}/${basename} ${root_device} ${args}
@@ -163,7 +163,7 @@ EOF
     for i in ${initrd}; do
       initrd_path="${initrd_path} ${rel_dirname}/${i}"
     done
-    if [ -d /sys/firmware/efi ]; then
+    if [ -d /sys/firmware/efi ] && [ "x${GRUB_USE_LINUXEFI}" = "xtrue" ]; then
       sed "s/^/$submenu_indentation/" << EOF
 	echo	'$(echo "$message" | grub_quote)'
 	initrdefi	$(echo $initrd_path)
