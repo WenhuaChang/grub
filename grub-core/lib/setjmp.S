@@ -17,6 +17,8 @@
 #include "./arm64/setjmp.S"
 #elif defined(__riscv)
 #include "./riscv/setjmp.S"
+#elif defined(__s390x__)
+#include "./s390x/setjmp.S"
 #else
 #error "Unknown target cpu type"
 #endif

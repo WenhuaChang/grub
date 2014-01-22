@@ -23,7 +23,7 @@
 #include <grub/symbol.h>
 #include <grub/types.h>
 
-#if defined (__i386__) || defined (__x86_64__)
+#if defined (__i386__) || defined (__x86_64__) || defined (__s390x__)
 static inline void
 grub_arch_sync_caches (void *address __attribute__ ((unused)),
 		       grub_size_t len __attribute__ ((unused)))

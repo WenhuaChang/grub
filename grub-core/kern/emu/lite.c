@@ -26,6 +26,8 @@
 #include "../arm64/dl.c"
 #elif defined(__riscv)
 #include "../riscv/dl.c"
+#elif defined(__s390x__)
+#include "../s390x/dl.c"
 #else
 #error "No target cpu type is defined"
 #endif
