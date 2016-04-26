@@ -318,6 +318,10 @@ print_entries (grub_menu_t menu, const struct menu_viewer_data *data)
 		   e, data);
       if (e)
 	e = e->next;
+
+      /* Skip hidden entries */
+      while (e && e->hidden)
+        e = e->next;
     }
 
   grub_term_gotoxy (data->term,
