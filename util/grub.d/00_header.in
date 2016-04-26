@@ -240,6 +240,10 @@ EOF
 	fi
 
     cat << EOF
+  if [ "\${grub_platform}" = "efi" ]; then
+    echo "Please press 't' to show the boot menu on this console"
+  fi
+
   set gfxmode=${GRUB_GFXMODE}
   load_video
   insmod gfxterm

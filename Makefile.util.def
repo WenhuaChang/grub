@@ -543,6 +543,12 @@ script = {
   installdir = grubconf;
 };
 
+script = {
+  name = '95_textmode';
+  common = util/grub.d/95_textmode.in;
+  installdir = grubconf;
+};
+
 program = {
   mansection = 1;
   name = grub-mkrescue;
