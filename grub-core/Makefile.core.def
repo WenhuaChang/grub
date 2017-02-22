@@ -2306,6 +2306,12 @@ module = {
   common = net/ethernet.c;
   common = net/arp.c;
   common = net/netbuff.c;
+  efi = net/efi/net.c;
+  efi = net/efi/http.c;
+  efi = net/efi/pxe.c;
+  efi = net/efi/ip4_config.c;
+  efi = net/efi/ip6_config.c;
+  efi = net/efi/dhcp.c;
 };
 
 module = {
