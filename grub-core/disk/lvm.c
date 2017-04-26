@@ -235,11 +235,16 @@ grub_lvm_detect (grub_disk_t disk,
 		     sizeof (mdah->magic)))
       || (grub_le_to_cpu32 (mdah->version) != GRUB_LVM_FMTT_VERSION))
     {
-      grub_error (GRUB_ERR_NOT_IMPLEMENTED_YET,
-		  "unknown LVM metadata header");
-#ifdef GRUB_UTIL
-      grub_util_info ("unknown LVM metadata header");
-#endif
+      /*
+       * It's not necessarily an error. There is no metadata recorded when
+       * PV is created with pvmetadatacopies set to zero. We need to process
+       * this kind of PV seperately.
+       */
+      id->uuid = grub_malloc(GRUB_LVM_ID_STRLEN);
+      if (!id->uuid)
+        goto fail;
+      grub_memcpy(id->uuid, pv_id, GRUB_LVM_ID_STRLEN);
+      id->uuidlen = GRUB_LVM_ID_STRLEN;
       goto fail;
     }
 

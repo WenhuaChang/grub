@@ -28,6 +28,7 @@
 #include <grub/i18n.h>
 #include <grub/util/misc.h>
 #endif
+#include <grub/lvm.h>
 
 GRUB_MOD_LICENSE ("GPLv3+");
 
@@ -43,7 +44,17 @@ static struct grub_diskfilter_lv *
 find_lv (const char *name);
 static int is_lv_readable (struct grub_diskfilter_lv *lv, int easily);
 
-
+struct grub_detached_pv {
+  struct grub_detached_pv *next;
+  struct grub_detached_pv **prev;
+  struct grub_diskfilter_pv_id id;
+  grub_disk_t disk;
+  grub_diskfilter_t diskfilter;
+} ;
+
+static struct grub_detached_pv *detached_pv_list;
+
+#define FOR_DETACHED_PVS(var) for (var = detached_pv_list; var; var = var->next)
 
 static grub_err_t
 is_node_readable (const struct grub_diskfilter_node *node, int easily)
@@ -132,6 +143,7 @@ scan_disk_partition_iter (grub_disk_t disk, grub_partition_t p, void *data)
   grub_disk_addr_t start_sector;
   struct grub_diskfilter_pv_id id;
   grub_diskfilter_t diskfilter;
+  struct grub_detached_pv *pv;
 
   grub_dprintf ("diskfilter", "Scanning for DISKFILTER devices on disk %s\n",
 		name);
@@ -168,6 +180,28 @@ scan_disk_partition_iter (grub_disk_t disk, grub_partition_t p, void *data)
 	    grub_free (id.uuid);
 	  return 0;
 	}
+      /*insert the special LVM PV into detached_pv_list*/
+      if (!arr && (id.uuidlen > 0) && (grub_strcmp(diskfilter->name, "lvm") == 0))
+	{
+	  pv = grub_zalloc(sizeof(*pv));
+	  if (!pv)
+	    return 1;
+	  pv->id.uuidlen = GRUB_LVM_ID_STRLEN;
+	  pv->id.uuid = grub_malloc(GRUB_LVM_ID_STRLEN);
+	  if (!pv->id.uuid)
+	    goto fail_id;
+	  grub_memcpy(pv->id.uuid, id.uuid, GRUB_LVM_ID_STRLEN);
+	  /*It's safe to save disk into this standalone pv list*/
+	  pv->disk = grub_disk_open(name);
+	  if (!pv->disk)
+	    goto fail_id;
+	  pv->diskfilter = diskfilter;
+	  grub_list_push (GRUB_AS_LIST_P (&detached_pv_list),
+                       GRUB_AS_LIST(pv));
+#ifdef GRUB_UTIL
+	  grub_util_info ("adding disk %s into detached pv list", name);
+#endif
+        }
       if (arr && id.uuidlen)
 	grub_free (id.uuid);
 
@@ -179,6 +213,65 @@ scan_disk_partition_iter (grub_disk_t disk, grub_partition_t p, void *data)
       grub_errno = GRUB_ERR_NONE;
     }
 
+  return 0;
+fail_id:
+  if (pv->id.uuidlen)
+    grub_free(pv->id.uuid);
+  grub_free(pv);
+  return 1;
+}
+
+static int
+process_detached_pv_list(void)
+{
+  struct grub_diskfilter_vg *arr;
+  struct grub_diskfilter_pv *pv1;
+  struct grub_detached_pv *pv2;
+  unsigned found = 0;
+
+  for (arr = array_list; arr != NULL; arr = arr->next)
+    {
+      for (pv1 = arr->pvs; pv1; pv1 = pv1->next)
+	{
+	  if (pv1->disk)
+	    continue;
+	  FOR_DETACHED_PVS(pv2)
+	    {
+	      if (pv2->id.uuidlen == pv1->id.uuidlen &&
+                    !grub_memcmp(pv2->id.uuid, pv1->id.uuid, pv1->id.uuidlen))
+		{
+		  if (insert_array(pv2->disk, &(pv2->id), arr, -1, pv2->diskfilter))
+		    return grub_errno;
+		  else
+		    {
+#ifdef GRUB_UTIL
+		      grub_util_info ("found disk %s in detached pv list", pv1->disk->name);
+#endif
+		      found = 1;
+		      break;
+		    }
+		}
+            }
+	  /*remove pv2 from the list*/
+	  if (found)
+            {
+#ifdef GRUB_UTIL
+	      grub_util_info ("removing disk %s from detached pv list", pv1->disk->name);
+#endif
+	      grub_list_remove(GRUB_AS_LIST (pv2));
+	      if (pv2->id.uuidlen)
+		{
+		  pv2->id.uuidlen = 0;
+		  grub_free(pv2->id.uuid);
+                }
+	      grub_disk_close(pv2->disk);
+	      grub_free(pv2);
+	      break;
+	    }
+	}
+      if (found)
+	break;
+    }
   return 0;
 }
 
@@ -206,6 +299,9 @@ scan_disk (const char *name, int accept_diskfilter)
   grub_partition_iterate (disk, scan_disk_partition_iter, (void *) name);
   grub_disk_close (disk);
   scan_depth--;
+
+  /*process the detached_pv_list*/
+  process_detached_pv_list();
   return 0;
 }
 
@@ -1250,6 +1346,20 @@ insert_array (grub_disk_t disk, const struct grub_diskfilter_pv_id *id,
 static void
 free_array (void)
 {
+  while(detached_pv_list)
+    {
+      struct grub_detached_pv *pv;
+      pv = detached_pv_list;
+      detached_pv_list = detached_pv_list->next;
+#ifdef GRUB_UTIL
+      grub_util_warn (_("Couldn't find disk for physical volume `%s'."
+	"Some LVs may not work normally."),pv->disk->name);
+#endif
+      if (pv->id.uuidlen)
+        grub_free(pv->id.uuid);
+      grub_disk_close(pv->disk);
+      grub_free(pv);
+    }
   while (array_list)
     {
       struct grub_diskfilter_vg *vg;
