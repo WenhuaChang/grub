@@ -756,34 +756,6 @@ is_prep_partition (grub_device_t dev)
   return 0;
 }
 
-static int
-is_prep_empty (grub_device_t dev)
-{
-  grub_disk_addr_t dsize, addr;
-  grub_uint32_t buffer[32768];
-
-  dsize = grub_disk_native_sectors (dev->disk);
-  for (addr = 0; addr < dsize;
-       addr += sizeof (buffer) / GRUB_DISK_SECTOR_SIZE)
-    {
-      grub_size_t sz = sizeof (buffer);
-      grub_uint32_t *ptr;
-
-      if (sizeof (buffer) / GRUB_DISK_SECTOR_SIZE > dsize - addr)
-	sz = (dsize - addr) * GRUB_DISK_SECTOR_SIZE;
-      grub_disk_read (dev->disk, addr, 0, sz, buffer);
-
-      if (addr == 0 && grub_memcmp (buffer, ELFMAG, SELFMAG) == 0)
-	return 1;
-
-      for (ptr = buffer; ptr < buffer + sz / sizeof (*buffer); ptr++)
-	if (*ptr)
-	  return 0;
-    }
-
-  return 1;
-}
-
 static void
 bless (grub_device_t dev, const char *path, int x86)
 {
@@ -1933,16 +1905,9 @@ main (int argc, char *argv[])
 	    {
 	      grub_util_error ("%s", _("the chosen partition is not a PReP partition"));
 	    }
-	  if (is_prep_empty (ins_dev))
+	  if (write_to_disk (ins_dev, imgfile))
 	    {
-	      if (write_to_disk (ins_dev, imgfile))
-		grub_util_error ("%s", _("failed to copy Grub to the PReP partition"));
-	    }
-	  else
-	    {
-	      char *s = xasprintf ("dd if=/dev/zero of=%s", install_device);
-	      grub_util_error (_("the PReP partition is not empty. If you are sure you want to use it, run dd to clear it: `%s'"),
-			       s);
+	      grub_util_error ("%s", _("failed to copy Grub to the PReP partition"));
 	    }
 	  grub_device_close (ins_dev);
 	  if (update_nvram)
