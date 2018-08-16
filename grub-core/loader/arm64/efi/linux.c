@@ -58,9 +58,24 @@ static grub_err_t
 grub_efi_linux_boot (void *kernel_address, grub_off_t offset,
 		     void *kernel_params)
 {
+  grub_efi_loaded_image_t *loaded_image = NULL;
   handover_func hf;
 
+  /*
+   * Since the EFI loader is not calling the LoadImage() and StartImage()
+   * services for loading the kernel and booting respectively, it has to
+   * set the Loaded Image base address.
+   */
+  loaded_image = grub_efi_get_loaded_image (grub_efi_image_handle);
+  if (loaded_image)
+    loaded_image->image_base = kernel_addr;
+  else
+    grub_dprintf ("linux", "Loaded Image base address could not be set\n");
+
+  grub_dprintf ("linux", "kernel_addr: %p handover_offset: %p params: %p\n",
+		kernel_address, (void *)(grub_efi_uintn_t)offset, kernel_params);
   hf = (handover_func)((char *)kernel_address + offset);
+  grub_dprintf ("linux", "handover_func() = %p\n", hf);
   hf (grub_efi_image_handle, grub_efi_system_table, kernel_params);
 
   return GRUB_ERR_BUG;
