@@ -974,6 +974,50 @@ grub_util_part_to_disk (const char *os_dev, struct stat *st,
 	  *pp = '\0';
 	  return path;
 	}
+
+      /* If this is a NVDIMM device in fsdax mode */
+      if (strncmp ("pmem", p, 4) == 0 && p[4] >= '0' && p[4] <= '9')
+	{
+	  /* /dev/pmem[0-9]+(\.[0-9]+)?((p[0-9]+)?|s[0-9]*) */
+	  char *pp = strchr (p + 4, 'p');
+	  if (pp)
+	    {
+	      *is_part = 1;
+	      *pp = '\0';
+	    }
+	  else
+	    {
+	      pp = strchr (p + 4, 's');
+	      if (pp && pp[1] >= '0' && pp[1] <= '9')
+		{
+		  *is_part = 1;
+		  pp[1] = '\0';
+		}
+	    }
+	  return path;
+	}
+
+      /* If this is a NVDIMM device in block mode */
+      if (strncmp ("ndblk", p, 5) == 0 && p[5] >= '0' && p[5] <= '9')
+	{
+	  /* /dev/ndblk[0-9]+\.[0-9]+((p[0-9]+)?|s[0-9]*) */
+	  char *pp = strchr (p + 5, 'p');
+	  if (pp)
+	    {
+	      *is_part = 1;
+	      *pp = '\0';
+	    }
+	  else
+	    {
+	      pp = strchr (p + 5, 's');
+	      if (pp && pp[1] >= '0' && pp[1] <= '9')
+		{
+		  *is_part = 1;
+		  pp[1] = '\0';
+		}
+	    }
+	  return path;
+	}
     }
 
   return path;
