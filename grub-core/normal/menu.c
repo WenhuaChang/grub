@@ -400,6 +400,15 @@ menu_set_chosen_entry (int entry)
 }
 
 static void
+menu_scroll_chosen_entry (int diren)
+{
+  struct grub_menu_viewer *cur;
+  for (cur = viewers; cur; cur = cur->next)
+    if (cur->scroll_chosen_entry)
+      cur->scroll_chosen_entry (cur->data, diren);
+}
+
+static void
 menu_print_timeout (int timeout)
 {
   struct grub_menu_viewer *cur;
@@ -825,6 +834,13 @@ run_menu (grub_menu_t menu, int nested, int *auto_boot)
 	      else
 		current_entry = menu->size - 1;
 	      menu_set_chosen_entry (current_entry);
+	      break;
+
+	    case GRUB_TERM_CTRL | 'l':
+	      menu_scroll_chosen_entry (1);
+	      break;
+	    case GRUB_TERM_CTRL | 'r':
+	      menu_scroll_chosen_entry (-1);
 	      break;
 
 	    case '\n':
