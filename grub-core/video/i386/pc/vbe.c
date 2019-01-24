@@ -994,7 +994,13 @@ grub_video_vbe_setup (unsigned int width, unsigned int height,
     {
       grub_vbe_get_preferred_mode (&width, &height);
       if (grub_errno == GRUB_ERR_NONE)
-	preferred_mode = 1;
+	{
+	  preferred_mode = 1;
+	  /* Limit the range of preferred resolution not exceeding FHD
+	     to keep the fixed bitmap font readable */
+	  width = (width < 1920) ? width : 1920;
+	  height = (height < 1080) ? height : 1080;
+	}
       else
 	{
 	  /* Fall back to 640x480.  This is conservative, but the largest

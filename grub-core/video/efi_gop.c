@@ -358,7 +358,7 @@ grub_video_gop_setup (unsigned int width, unsigned int height,
   grub_err_t err;
   unsigned bpp;
   int found = 0;
-  int avoid_low_resolution = 1;
+  int avoid_extreme_resolution = 1;
   unsigned long long best_volume = 0;
   unsigned int preferred_width = 0, preferred_height = 0;
   grub_uint8_t *buffer;
@@ -375,13 +375,21 @@ grub_video_gop_setup (unsigned int width, unsigned int height,
 	  preferred_height = 600;
 	  grub_errno = GRUB_ERR_NONE;
 	}
+      else
+	{
+	  /* Limit the range of preferred resolution not exceeding FHD
+	     to keep the fixed bitmap font readable */
+	  preferred_width = (preferred_width < 1920) ? preferred_width : 1920;
+	  preferred_height = (preferred_height < 1080) ? preferred_height : 1080;
+	}
     }
 
 again:
   /* Keep current mode if possible.  */
   if (gop->mode->info &&
-      (!avoid_low_resolution ||
-       (gop->mode->info->width >= 800 && gop->mode->info->height >= 600)))
+      (!avoid_extreme_resolution ||
+       ((gop->mode->info->width >= 800 && gop->mode->info->height >= 600) &&
+       (gop->mode->info->width <= 1920 && gop->mode->info->height <= 1080))))
     {
       bpp = grub_video_gop_get_bpp (gop->mode->info);
       if (bpp && ((width == gop->mode->info->width
@@ -454,9 +462,9 @@ again:
 
   if (!found)
     {
-      if (avoid_low_resolution && gop->mode->info)
+      if (avoid_extreme_resolution && gop->mode->info)
         {
-          avoid_low_resolution = 0;
+          avoid_extreme_resolution = 0;
           goto again;
         }
       grub_dprintf ("video", "GOP: no mode found\n");
