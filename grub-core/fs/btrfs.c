@@ -17,6 +17,7 @@
  *  along with GRUB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#ifndef GRUB_MACHINE_PCBIOS
 /*
  * Tell zstd to expose functions that aren't part of the stable API, which
  * aren't safe to use when linking against a dynamic library. We vendor in a
@@ -24,6 +25,7 @@
  * functions to provide our own allocator, which uses grub_malloc(), to zstd.
  */
 #define ZSTD_STATIC_LINKING_ONLY
+#endif
 
 #include <grub/err.h>
 #include <grub/file.h>
@@ -35,7 +37,9 @@
 #include <grub/lib/crc.h>
 #include <grub/deflate.h>
 #include <minilzo.h>
+#ifndef GRUB_MACHINE_PCBIOS
 #include <zstd.h>
+#endif
 #include <grub/i18n.h>
 #include <grub/btrfs.h>
 #include <grub/crypto.h>
@@ -61,8 +65,10 @@ GRUB_MOD_LICENSE ("GPLv3+");
 #define GRUB_BTRFS_LZO_BLOCK_MAX_CSIZE (GRUB_BTRFS_LZO_BLOCK_SIZE + \
 				     (GRUB_BTRFS_LZO_BLOCK_SIZE / 16) + 64 + 3)
 
+#ifndef GRUB_MACHINE_PCBIOS
 #define ZSTD_BTRFS_MAX_WINDOWLOG 17
 #define ZSTD_BTRFS_MAX_INPUT     (1 << ZSTD_BTRFS_MAX_WINDOWLOG)
+#endif
 
 typedef grub_uint8_t grub_btrfs_checksum_t[0x20];
 typedef grub_uint16_t grub_btrfs_uuid_t[8];
@@ -247,7 +253,9 @@ struct grub_btrfs_extent_data
 #define GRUB_BTRFS_COMPRESSION_NONE 0
 #define GRUB_BTRFS_COMPRESSION_ZLIB 1
 #define GRUB_BTRFS_COMPRESSION_LZO  2
+#ifndef GRUB_MACHINE_PCBIOS
 #define GRUB_BTRFS_COMPRESSION_ZSTD 3
+#endif
 
 #define GRUB_BTRFS_OBJECT_ID_CHUNK 0x100
 
@@ -1392,6 +1400,7 @@ grub_btrfs_read_inode (struct grub_btrfs_data *data,
   return grub_btrfs_read_logical (data, elemaddr, inode, sizeof (*inode), 0);
 }
 
+#ifndef GRUB_MACHINE_PCBIOS
 static void *grub_zstd_malloc (void *state __attribute__((unused)), size_t size)
 {
   return grub_malloc (size);
@@ -1481,6 +1490,7 @@ err:
 
   return ret;
 }
+#endif
 
 static grub_ssize_t
 grub_btrfs_lzo_decompress(char *ibuf, grub_size_t isize, grub_off_t off,
@@ -1657,8 +1667,12 @@ grub_btrfs_extent_read (struct grub_btrfs_data *data,
 
       if (data->extent->compression != GRUB_BTRFS_COMPRESSION_NONE
 	  && data->extent->compression != GRUB_BTRFS_COMPRESSION_ZLIB
+#ifndef GRUB_MACHINE_PCBIOS
 	  && data->extent->compression != GRUB_BTRFS_COMPRESSION_LZO
 	  && data->extent->compression != GRUB_BTRFS_COMPRESSION_ZSTD)
+#else
+	  && data->extent->compression != GRUB_BTRFS_COMPRESSION_LZO)
+#endif
 	{
 	  grub_error (GRUB_ERR_NOT_IMPLEMENTED_YET,
 		      "compression type 0x%x not supported",
@@ -1698,6 +1712,7 @@ grub_btrfs_extent_read (struct grub_btrfs_data *data,
 		  != (grub_ssize_t) csize)
 		return -1;
 	    }
+#ifndef GRUB_MACHINE_PCBIOS
 	  else if (data->extent->compression == GRUB_BTRFS_COMPRESSION_ZSTD)
 	    {
 	      if (grub_btrfs_zstd_decompress (data->extent->inl, data->extsize -
@@ -1707,6 +1722,7 @@ grub_btrfs_extent_read (struct grub_btrfs_data *data,
 		  != (grub_ssize_t) csize)
 		return -1;
 	    }
+#endif
 	  else
 	    grub_memcpy (buf, data->extent->inl + extoff, csize);
 	  break;
@@ -1744,10 +1760,12 @@ grub_btrfs_extent_read (struct grub_btrfs_data *data,
 		ret = grub_btrfs_lzo_decompress (tmp, zsize, extoff
 				    + grub_le_to_cpu64 (data->extent->offset),
 				    buf, csize);
+#ifndef GRUB_MACHINE_PCBIOS
 	      else if (data->extent->compression == GRUB_BTRFS_COMPRESSION_ZSTD)
 		ret = grub_btrfs_zstd_decompress (tmp, zsize, extoff
 				    + grub_le_to_cpu64 (data->extent->offset),
 				    buf, csize);
+#endif
 	      else
 		ret = -1;
 
