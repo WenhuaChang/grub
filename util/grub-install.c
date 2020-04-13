@@ -42,6 +42,7 @@
 #include <grub/emu/config.h>
 #include <grub/util/ofpath.h>
 #include <grub/hfsplus.h>
+#include <grub/time.h>
 
 #include <string.h>
 
@@ -2025,6 +2026,24 @@ main (int argc, char *argv[])
       break;
     }
 
+  {
+    const char *journaled_fs[] = {"xfs", "ext2", NULL};
+    int i;
+
+    for (i = 0; journaled_fs[i]; ++i)
+      if (grub_strcmp (grub_fs->name, journaled_fs[i]) == 0)
+	{
+	  int retries = 10;
+
+	  /* If the fs is already frozen at that point, we could generally
+	   * expected that it will be soon unfrozen again (assuming some other
+	   * process has frozen it for snapshotting or something), so we may
+	   * as well retry a few (limited) times in a delay loop. */
+	  while (retries-- && !grub_install_sync_fs_journal (grubdir))
+	    grub_sleep (1);
+	  break;
+	}
+  }
   /*
    * Either there are no platform specific code, or it didn't raise
    * ponr. Raise it here, because usually this is already past point

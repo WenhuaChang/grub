@@ -663,6 +663,7 @@ program = {
   emu_condition = COND_s390x;
   common = grub-core/kern/emu/argp_common.c;
   common = grub-core/osdep/init.c;
+  common = grub-core/osdep/journaled_fs.c;
 
   ldadd = '$(LIBLZMA)';
   ldadd = libgrubmods.a;
