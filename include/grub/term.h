@@ -102,8 +102,10 @@ grub_term_color_state;
 #define GRUB_TERM_NO_EDIT	        (1 << 1)
 /* Set when the terminal cannot do fancy things.  */
 #define GRUB_TERM_DUMB		        (1 << 2)
+/* Set when the terminal is line oriented. */
+#define GRUB_TERM_LINE		        (1 << 3)
 /* Which encoding does terminal expect stream to be.  */
-#define GRUB_TERM_CODE_TYPE_SHIFT       3
+#define GRUB_TERM_CODE_TYPE_SHIFT       4
 #define GRUB_TERM_CODE_TYPE_MASK	        (7 << GRUB_TERM_CODE_TYPE_SHIFT)
 /* Only ASCII characters accepted.  */
 #define GRUB_TERM_CODE_TYPE_ASCII	        (0 << GRUB_TERM_CODE_TYPE_SHIFT)

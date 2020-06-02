@@ -981,7 +981,7 @@ grub_print_ucs4_menu (const grub_uint32_t * str,
 {
   print_ucs4_real (str, last_position, margin_left, margin_right,
 		   term, 0, 0, 1, skip_lines, max_lines,
-		   contchar, 1, pos);
+		   contchar, (term->flags & GRUB_TERM_DUMB)? 0 : 1, pos);
 }
 
 void
