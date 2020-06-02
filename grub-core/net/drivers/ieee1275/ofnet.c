@@ -220,7 +220,7 @@ grub_ieee1275_parse_bootpath (const char *devpath, char *bootpath,
                                  flags);
       inter->vlantag = vlantag;
       grub_net_add_ipv4_local (inter,
-                          __builtin_ctz (~grub_le_to_cpu32 (subnet_mask.ipv4)));
+                          __builtin_clz (~ (subnet_mask.ipv4)));
 
     }
 
