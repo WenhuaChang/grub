@@ -30,6 +30,12 @@ struct grub_ieee1275_mem_region
   unsigned int size;
 };
 
+#define IEEE1275_MAX_MAP_RESOURCE 10
+struct grub_map_track {
+  grub_addr_t addr;
+  grub_size_t size;
+};
+
 #define IEEE1275_MAX_PROP_LEN	8192
 #define IEEE1275_MAX_PATH_LEN	256
 
@@ -235,6 +241,7 @@ char *EXPORT_FUNC(grub_ieee1275_encode_uint4) (grub_ieee1275_ihandle_t ihandle,
 int EXPORT_FUNC(grub_ieee1275_get_block_size) (grub_ieee1275_ihandle_t ihandle);
 
 grub_err_t EXPORT_FUNC(grub_claimmap) (grub_addr_t addr, grub_size_t size);
+void EXPORT_FUNC(grub_releasemap) (void);
 
 int
 EXPORT_FUNC(grub_ieee1275_map) (grub_addr_t phys, grub_addr_t virt,

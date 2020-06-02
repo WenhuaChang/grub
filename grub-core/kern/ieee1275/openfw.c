@@ -302,6 +302,34 @@ grub_ieee1275_map (grub_addr_t phys, grub_addr_t virt, grub_size_t size,
   return args.catch_result;
 }
 
+/* Preallocate IEEE1275_MAX_MAP_RESOURCE map tracks to track the
+ * map regions allocated to us by the firmware. Cannot
+ * dynamically allocate them, since the heap is not set
+ * yet.
+ */
+struct grub_map_track  grub_map_track[IEEE1275_MAX_MAP_RESOURCE];
+int grub_map_track_index=0;
+
+void
+grub_releasemap ()
+{
+  int i=0;
+  for (i=grub_map_track_index-1; i >= 0; i--)
+   grub_ieee1275_release(grub_map_track[i].addr, grub_map_track[i].size);
+  grub_map_track_index = 0;
+  return;
+}
+
+static void
+grub_track_map (grub_addr_t addr, grub_size_t size)
+{
+  if (grub_map_track_index >= IEEE1275_MAX_MAP_RESOURCE)
+   return;
+  grub_map_track[grub_map_track_index].addr = addr;
+  grub_map_track[grub_map_track_index++].size = size;
+  return;
+}
+
 grub_err_t
 grub_claimmap (grub_addr_t addr, grub_size_t size)
 {
@@ -317,6 +345,7 @@ grub_claimmap (grub_addr_t addr, grub_size_t size)
       return grub_errno;
     }
 
+  grub_track_map (addr, size);
   return GRUB_ERR_NONE;
 }
 

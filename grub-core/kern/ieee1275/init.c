@@ -73,6 +73,7 @@ grub_addr_t grub_ieee1275_original_stack;
 void
 grub_exit (void)
 {
+  grub_releasemap();
   grub_ieee1275_exit ();
 }
 
