@@ -272,8 +272,28 @@ grub_util_biosdisk_get_grub_dev (const char *os_dev)
   grub_util_info ("%s is a parent of %s", sys_disk, os_dev);
   if (!is_part)
     {
+#if defined(__APPLE__)
       free (sys_disk);
       return make_device_name (drive);
+#else
+      char *name, *ldm_name;
+      grub_disk_t disk;
+
+      free (sys_disk);
+      name = make_device_name (drive);
+      disk = grub_disk_open (name);
+      if (!disk)
+        return name;
+      ldm_name = grub_util_get_ldm (disk, 0);
+      if (ldm_name)
+        {
+	  grub_disk_close (disk);
+          grub_free (name);
+	  return ldm_name;
+        }
+      grub_disk_close (disk);
+      return name;
+#endif
     }
   free (sys_disk);
 
