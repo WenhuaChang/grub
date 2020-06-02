@@ -23,8 +23,11 @@
 #include <grub/util/misc.h>
 #include <grub/lib/envblk.h>
 #include <grub/i18n.h>
-#include <grub/emu/hostfile.h>
+#include <grub/emu/hostdisk.h>
 #include <grub/util/install.h>
+#include <grub/emu/getroot.h>
+#include <grub/fs.h>
+#include <grub/crypto.h>
 
 #include <stdio.h>
 #include <unistd.h>
@@ -120,6 +123,140 @@ block, use `rm %s'."),
   NULL, help_filter, NULL
 };
 
+struct fs_envblk_spec {
+  const char *fs_name;
+  int offset;
+  int size;
+} fs_envblk_spec[] = {
+  { "btrfs", 256 * 1024, GRUB_DISK_SECTOR_SIZE },
+  { NULL, 0, 0 }
+};
+
+struct fs_envblk {
+  struct fs_envblk_spec *spec;
+  const char *dev;
+};
+
+typedef struct fs_envblk_spec *fs_envblk_spec_t;
+typedef struct fs_envblk *fs_envblk_t;
+
+fs_envblk_t fs_envblk = NULL;
+
+static int
+read_envblk_fs (const char *varname, const char *value, void *hook_data)
+{
+  grub_envblk_t *p_envblk = (grub_envblk_t *)hook_data;
+
+  if (!p_envblk || !fs_envblk)
+    return 0;
+
+  if (strcmp (varname, "env_block") == 0)
+    {
+      int off, sz;
+      char *p;
+
+      off = strtol (value, &p, 10);
+      if (*p == '+')
+	sz = strtol (p+1, &p, 10);
+
+      if (*p == '\0')
+	{
+	  FILE *fp;
+	  char *buf;
+
+	  off <<= GRUB_DISK_SECTOR_BITS;
+	  sz <<= GRUB_DISK_SECTOR_BITS;
+
+	  fp = grub_util_fopen (fs_envblk->dev, "rb");
+	  if (! fp)
+	    grub_util_error (_("cannot open `%s': %s"), fs_envblk->dev,
+				strerror (errno));
+
+
+	  if (fseek (fp, off, SEEK_SET) < 0)
+	    grub_util_error (_("cannot seek `%s': %s"), fs_envblk->dev,
+				strerror (errno));
+
+	  buf = xmalloc (sz);
+	  if ((fread (buf, 1, sz, fp)) != sz)
+	    grub_util_error (_("cannot read `%s': %s"), fs_envblk->dev,
+				strerror (errno));
+
+	  fclose (fp);
+
+	  *p_envblk = grub_envblk_open (buf, sz);
+	}
+    }
+
+  return 0;
+}
+
+static void
+create_envblk_fs (void)
+{
+  FILE *fp;
+  char *buf;
+  const char *device;
+  int offset, size;
+
+  if (!fs_envblk)
+    return;
+
+  device = fs_envblk->dev;
+  offset = fs_envblk->spec->offset;
+  size = fs_envblk->spec->size;
+
+  fp = grub_util_fopen (device, "r+b");
+  if (! fp)
+    grub_util_error (_("cannot open `%s': %s"), device, strerror (errno));
+
+  buf = xmalloc (size);
+  memcpy (buf, GRUB_ENVBLK_SIGNATURE, sizeof (GRUB_ENVBLK_SIGNATURE) - 1);
+  memset (buf + sizeof (GRUB_ENVBLK_SIGNATURE) - 1, '#', size - sizeof (GRUB_ENVBLK_SIGNATURE) + 1);
+
+  if (fseek (fp, offset, SEEK_SET) < 0)
+    grub_util_error (_("cannot seek `%s': %s"), device, strerror (errno));
+
+  if (fwrite (buf, 1, size, fp) != size)
+    grub_util_error (_("cannot write to `%s': %s"), device, strerror (errno));
+
+  grub_util_file_sync (fp);
+  free (buf);
+  fclose (fp);
+}
+
+static grub_envblk_t
+open_envblk_fs (grub_envblk_t envblk)
+{
+  grub_envblk_t envblk_fs = NULL;
+  char *val;
+  int offset, size;
+
+  if (!fs_envblk)
+    return NULL;
+
+  offset = fs_envblk->spec->offset;
+  size = fs_envblk->spec->size;
+
+  grub_envblk_iterate (envblk, &envblk_fs, read_envblk_fs);
+
+  if (envblk_fs && grub_envblk_size (envblk_fs) == size)
+    return envblk_fs;
+
+  create_envblk_fs ();
+
+  offset = offset >> GRUB_DISK_SECTOR_BITS;
+  size =  (size + GRUB_DISK_SECTOR_SIZE - 1) >> GRUB_DISK_SECTOR_BITS;
+
+  val = xasprintf ("%d+%d", offset, size);
+  if (! grub_envblk_set (envblk, "env_block", val))
+    grub_util_error ("%s", _("environment block too small"));
+  grub_envblk_iterate (envblk, &envblk_fs, read_envblk_fs);
+  free (val);
+
+  return envblk_fs;
+}
+
 static grub_envblk_t
 open_envblk_file (const char *name)
 {
@@ -182,10 +319,17 @@ static void
 list_variables (const char *name)
 {
   grub_envblk_t envblk;
+  grub_envblk_t envblk_fs = NULL;
 
   envblk = open_envblk_file (name);
+  grub_envblk_iterate (envblk, &envblk_fs, read_envblk_fs);
   grub_envblk_iterate (envblk, NULL, print_var);
   grub_envblk_close (envblk);
+  if (envblk_fs)
+    {
+      grub_envblk_iterate (envblk_fs, NULL, print_var);
+      grub_envblk_close (envblk_fs);
+    }
 }
 
 static void
@@ -209,6 +353,38 @@ write_envblk (const char *name, grub_envblk_t envblk)
 }
 
 static void
+write_envblk_fs (grub_envblk_t envblk)
+{
+  FILE *fp;
+  const char *device;
+  int offset, size;
+
+  if (!fs_envblk)
+    return;
+
+  device = fs_envblk->dev;
+  offset = fs_envblk->spec->offset;
+  size = fs_envblk->spec->size;
+
+  if (grub_envblk_size (envblk) > size)
+    grub_util_error ("%s", _("environment block too small"));
+
+  fp = grub_util_fopen (device, "r+b");
+
+  if (! fp)
+    grub_util_error (_("cannot open `%s': %s"), device, strerror (errno));
+
+  if (fseek (fp, offset, SEEK_SET) < 0)
+    grub_util_error (_("cannot seek `%s': %s"), device, strerror (errno));
+
+  if (fwrite (grub_envblk_buffer (envblk), 1, grub_envblk_size (envblk), fp) != grub_envblk_size (envblk))
+    grub_util_error (_("cannot write to `%s': %s"), device, strerror (errno));
+
+  grub_util_file_sync (fp);
+  fclose (fp);
+}
+
+static void
 set_variables (const char *name, int argc, char *argv[])
 {
   grub_envblk_t envblk;
@@ -224,8 +400,27 @@ set_variables (const char *name, int argc, char *argv[])
 
       *(p++) = 0;
 
-      if (! grub_envblk_set (envblk, argv[0], p))
-        grub_util_error ("%s", _("environment block too small"));
+      if ((strcmp (argv[0], "next_entry") == 0 ||
+	  strcmp (argv[0], "health_checker_flag") == 0) && fs_envblk)
+	{
+	  grub_envblk_t envblk_fs;
+	  envblk_fs = open_envblk_fs (envblk);
+	  if (!envblk_fs)
+	    grub_util_error ("%s", _("can't open fs environment block"));
+	  if (! grub_envblk_set (envblk_fs, argv[0], p))
+	    grub_util_error ("%s", _("environment block too small"));
+	  write_envblk_fs (envblk_fs);
+	  grub_envblk_close (envblk_fs);
+	}
+      else if (strcmp (argv[0], "env_block") == 0)
+	{
+	  grub_util_warn ("can't set env_block as it's read-only");
+	}
+      else
+	{
+	  if (! grub_envblk_set (envblk, argv[0], p))
+	    grub_util_error ("%s", _("environment block too small"));
+	}
 
       argc--;
       argv++;
@@ -233,17 +428,27 @@ set_variables (const char *name, int argc, char *argv[])
 
   write_envblk (name, envblk);
   grub_envblk_close (envblk);
+
 }
 
 static void
 unset_variables (const char *name, int argc, char *argv[])
 {
   grub_envblk_t envblk;
+  grub_envblk_t envblk_fs;
 
   envblk = open_envblk_file (name);
+
+  envblk_fs = NULL;
+  if (fs_envblk)
+    envblk_fs = open_envblk_fs (envblk);
+
   while (argc)
     {
       grub_envblk_delete (envblk, argv[0]);
+
+      if (envblk_fs)
+	grub_envblk_delete (envblk_fs, argv[0]);
 
       argc--;
       argv++;
@@ -251,7 +456,129 @@ unset_variables (const char *name, int argc, char *argv[])
 
   write_envblk (name, envblk);
   grub_envblk_close (envblk);
+
+  if (envblk_fs)
+    {
+      write_envblk_fs (envblk_fs);
+      grub_envblk_close (envblk_fs);
+    }
 }
+
+int have_abstraction = 0;
+static void
+probe_abstraction (grub_disk_t disk)
+{
+  if (disk->partition == NULL)
+    grub_util_info ("no partition map found for %s", disk->name);
+
+  if (disk->dev->id == GRUB_DISK_DEVICE_DISKFILTER_ID ||
+      disk->dev->id == GRUB_DISK_DEVICE_CRYPTODISK_ID)
+    {
+      have_abstraction = 1;
+    }
+}
+
+static fs_envblk_t
+probe_fs_envblk (fs_envblk_spec_t spec)
+{
+  char **grub_devices;
+  char **curdev, **curdrive;
+  size_t ndev = 0;
+  char **grub_drives;
+  grub_device_t grub_dev = NULL;
+  grub_fs_t grub_fs;
+  const char *fs_envblk_device;
+
+#ifdef __s390x__
+  return NULL;
+#endif
+
+  grub_util_biosdisk_init (DEFAULT_DEVICE_MAP);
+  grub_init_all ();
+  grub_gcry_init_all ();
+
+  grub_lvm_fini ();
+  grub_mdraid09_fini ();
+  grub_mdraid1x_fini ();
+  grub_diskfilter_fini ();
+  grub_diskfilter_init ();
+  grub_mdraid09_init ();
+  grub_mdraid1x_init ();
+  grub_lvm_init ();
+
+  grub_devices = grub_guess_root_devices (DEFAULT_DIRECTORY);
+
+  if (!grub_devices || !grub_devices[0])
+    grub_util_error (_("cannot find a device for %s (is /dev mounted?)"), DEFAULT_DIRECTORY);
+
+  fs_envblk_device = grub_devices[0];
+
+  for (curdev = grub_devices; *curdev; curdev++)
+    {
+      grub_util_pull_device (*curdev);
+      ndev++;
+    }
+
+  grub_drives = xcalloc ((ndev + 1), sizeof (grub_drives[0]));
+
+  for (curdev = grub_devices, curdrive = grub_drives; *curdev; curdev++,
+       curdrive++)
+    {
+      *curdrive = grub_util_get_grub_dev (*curdev);
+      if (! *curdrive)
+	grub_util_error (_("cannot find a GRUB drive for %s.  Check your device.map"),
+			 *curdev);
+    }
+  *curdrive = 0;
+
+  grub_dev = grub_device_open (grub_drives[0]);
+  if (! grub_dev)
+    grub_util_error ("%s", grub_errmsg);
+
+  grub_fs = grub_fs_probe (grub_dev);
+  if (! grub_fs)
+    grub_util_error ("%s", grub_errmsg);
+
+  if (grub_dev->disk)
+    {
+      probe_abstraction (grub_dev->disk);
+    }
+  for (curdrive = grub_drives + 1; *curdrive; curdrive++)
+    {
+      grub_device_t dev = grub_device_open (*curdrive);
+      if (!dev)
+	continue;
+      if (dev->disk)
+	probe_abstraction (dev->disk);
+      grub_device_close (dev);
+    }
+
+  free (grub_drives);
+  grub_device_close (grub_dev);
+  grub_gcry_fini_all ();
+  grub_fini_all ();
+  grub_util_biosdisk_fini ();
+
+  fs_envblk_spec_t p;
+
+  for (p = spec; p->fs_name; p++)
+    {
+      if (strcmp (grub_fs->name, p->fs_name) == 0 && !have_abstraction)
+	{
+	  if (p->offset % GRUB_DISK_SECTOR_SIZE == 0 &&
+	      p->size % GRUB_DISK_SECTOR_SIZE == 0)
+	    {
+	      fs_envblk = xmalloc (sizeof (fs_envblk_t));
+	      fs_envblk->spec = p;
+	      fs_envblk->dev = strdup(fs_envblk_device);
+	      return fs_envblk;
+	    }
+	}
+    }
+
+  return NULL;
+}
+
 
 int
 main (int argc, char *argv[])
@@ -283,6 +610,9 @@ main (int argc, char *argv[])
         filename = DEFAULT_ENVBLK_PATH;
       command  = argv[curindex++];
     }
+
+  if (strcmp (filename, DEFAULT_ENVBLK_PATH) == 0)
+    fs_envblk = probe_fs_envblk (fs_envblk_spec);
 
   if (strcmp (command, "create") == 0)
     grub_util_create_envblk_file (filename);

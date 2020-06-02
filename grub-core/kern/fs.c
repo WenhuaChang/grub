@@ -27,6 +27,7 @@
 #include <grub/mm.h>
 #include <grub/term.h>
 #include <grub/i18n.h>
+#include <grub/partition.h>
 
 grub_fs_t grub_fs_list = 0;
 
@@ -230,6 +231,13 @@ grub_fs_blocklist_read (grub_file_t file, char *buf, grub_size_t len)
 			      size, buf) != GRUB_ERR_NONE)
 	    return -1;
 
+	  if (file->read_hook)
+	    {
+	      grub_disk_addr_t part_start;
+
+	      part_start = grub_partition_get_start (file->device->disk->partition);
+	      file->read_hook (p->offset + sector + part_start, (unsigned)offset, (unsigned)size, file->read_hook_data);
+	    }
 	  ret += size;
 	  len -= size;
 	  sector -= ((size + offset) >> GRUB_DISK_SECTOR_BITS);
