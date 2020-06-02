@@ -45,6 +45,7 @@ defaultmenu = menu
     timeout = 60
     default = 1
     prompt = 0
+    secure = @SUSE_SECURE_BOOT@
     1 = grub2
     2 = skip-grub2
     3 = grub2-mem1G

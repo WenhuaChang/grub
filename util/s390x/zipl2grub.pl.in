@@ -21,6 +21,7 @@ my $miss = 0;
 my $cfg = "";
 my %fsdev = ();
 my %fstype = ();
+my %SBL = (); # key/value of $sysconfbl
 
 my %C = (
   GRUB_CMDLINE_LINUX_DEFAULT => "quiet splash=silent",
@@ -251,6 +252,15 @@ if ( -r $default ) {
   }
   close( IN);
 }
+if ( -r $sysconfbl ) {
+  open( IN, "< $sysconfbl") ||  die;
+  while ( <IN> ) {
+    next if ( m{^\s*#} );
+    next unless ( m{^\s*([^=#\s]+)="(.*)"(?:\s*|\s+#.*)$} );
+    $SBL{$1} = $2;
+  }
+  close( IN);
+}
 if ( -r "/etc/fstab" ) {
   my $regex = qr{^(\S+)\s+(\S+)\s+(\S+)\s+\S+\s+\S+\s+\S+\s*(?:#.*)?$};
   open( IN, "< /etc/fstab") || die;
@@ -313,19 +323,19 @@ if ( ! exists( $C{GRUB_DEVICE}) ) {
   }
 }
 if ( $C{GRUB_CMDLINE_LINUX_DEFAULT} eq "quiet splash=silent" &&
-     -r $sysconfbl) {
-  open( IN, "< $sysconfbl") ||  die;
-  while ( <IN> ) {
-    next if ( m{^\s*#} );
-    if ( m{^DEFAULT_APPEND=".*"(?:\s*|\s+#.*)$} ) {
-      $C{GRUB_CMDLINE_LINUX_DEFAULT} = $1;
-    }
-  }
-  close( IN);
+     exists( $SBL{DEFAULT_APPEND}) ) {
+  $C{GRUB_CMDLINE_LINUX_DEFAULT} = $SBL{DEFAULT_APPEND};
 }
 
 if ( ! exists( $C{GRUB_DEVICE})) {
   Panic( 0, "$C: Default not ready and no fallback.  Please retry later!\n");
+}
+
+if ( !exists( $C{SUSE_SECURE_BOOT}) ) {
+  $C{SUSE_SECURE_BOOT} = "0";
+  if ( exists( $SBL{SECURE_BOOT}) && $SBL{SECURE_BOOT} =~ m{^(yes|true|1)$} ) {
+    $C{SUSE_SECURE_BOOT} = "1";
+  }
 }
 
 if ( ! exists( $C{GRUB_EMU_CONMODE}) && exists( $C{GRUB_CONMODE}) ) {
@@ -359,6 +369,9 @@ foreach ("GRUB_EMU_CONMODE", "GRUB_CONMODE") {
 if ( $debug && $verbose > 2 ) {
   foreach ( sort( keys( %C)) ) {
     printf( "%s=\"%s\"\n", $_, $C{$_});
+  }
+  foreach ( sort( keys( %SBL)) ) {
+    printf( "SBL: %s=\"%s\"\n", $_, $SBL{$_});
   }
 }
 

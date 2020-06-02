@@ -38,7 +38,7 @@ grub_linux_boot (void)
 {
   grub_err_t rc = GRUB_ERR_NONE;
   char *initrd_param;
-  const char *kexec[] = { "kexec", "-l", kernel_path, boot_cmdline, NULL, NULL };
+  const char *kexec[] = { "kexec", "-la", kernel_path, boot_cmdline, NULL, NULL };
   const char *systemctl[] = { "systemctl", "kexec", NULL };
   int kexecute = grub_util_get_kexecute();
 
@@ -51,7 +51,7 @@ grub_linux_boot (void)
     //return grub_error (GRUB_ERR_BAD_ARGUMENT, N_("initrd required!"));
   }
 
-  grub_printf("%serforming 'kexec -l %s %s %s'\n",
+  grub_printf("%serforming 'kexec -la %s %s %s'\n",
 	(kexecute) ? "P" : "Not p",
 	kernel_path, initrd_param, boot_cmdline);
 

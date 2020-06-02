@@ -18,6 +18,9 @@ if getargbool 0 initgrub && [ ! -e /grub2skip ] || [ -e /grub2force ]; then
    done < /proc/mounts
    echo $rofs
   }
+  checkcat() {
+    [ -r $1 ] && cat $1
+  }
   checkd() {
     [ -d $1 ] && echo true || echo false
   }
@@ -63,6 +66,7 @@ if getargbool 0 initgrub && [ ! -e /grub2skip ] || [ -e /grub2force ]; then
     export grub2bootfs=$(checkboot)
     export grub2devfs=$(checkd /sysroot/dev/disk)
     export grub2snap=$(checksnap)
+    export grub2secure=$(checkcat /sys/firmware/ipl/secure)
     debug "" export -p
 
         _ctty="$(RD_DEBUG= getarg rd.ctty=)" && _ctty="/dev/${_ctty##*/}"
@@ -93,7 +97,7 @@ if getargbool 0 initgrub && [ ! -e /grub2skip ] || [ -e /grub2force ]; then
     debug "Trying grub2-emu (ro=$grub2rofs, TERM=$TERM, ctty=$_ctty)..."
     setsid $CTTY -- chroot /sysroot $bindir/grub2-emu -X -X 0<>$_ctty 1>&0 2>&0
 
-    if [ -x /sysroot@libdir@/grub2/zipl-refresh ]; then
+    if [ "$grub2secure" != 1 ]&&[ -x /sysroot@libdir@/grub2/zipl-refresh ]; then
 	setsid $CTTY -- /sysroot@libdir@/grub2/zipl-refresh 0<>$_ctty 1>&0 2>&0
 	if [ $? != 0 ]; then
 	    warn "Not continuing"
@@ -103,10 +107,16 @@ if getargbool 0 initgrub && [ ! -e /grub2skip ] || [ -e /grub2force ]; then
 	    sleep 3
 	    reboot
 	fi
-    else
+    elif [ "$grub2secure" != 1 ]; then
 	echo "
   Attention: 'grub2' failed to start the target kernel and 'zipl-refresh'
   is not available.  This should never happen.  Please contact support." >& $_ctty
+	warn "Not continuing"
+	emergency_shell -n grub2-emu-kexec
+    else
+	echo "
+  Attention: 'grub2' failed to start the target kernel and secure boot seems
+  active.  Automatic recovery not available.  Please contact support." >& $_ctty
 	warn "Not continuing"
 	emergency_shell -n grub2-emu-kexec
     fi
