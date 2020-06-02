@@ -1,0 +1,26 @@
+## This is the template for '@zipldir@/config' and is subject to
+## rpm's %config file handling in case of grub2-s390x-emu package update.
+
+[defaultboot]
+defaultmenu = menu
+
+[grub2]
+    target = @zipldir@
+    ramdisk = @zipldir@/initrd,0x2000000
+    image = @zipldir@/image
+    parameters = "root=@GRUB_DEVICE@ @GRUB_EMU_CONMODE@ @GRUB_CMDLINE_LINUX@ @GRUB_CMDLINE_LINUX_DEFAULT@ initgrub quiet splash=silent plymouth.enable=0 "
+
+[skip-grub2]
+    target = @zipldir@
+    ramdisk = @zipldir@/initrd,0x2000000
+    image = @zipldir@/image
+    parameters = "root=@GRUB_DEVICE@ @GRUB_CONMODE@ @GRUB_CMDLINE_LINUX@ @GRUB_CMDLINE_LINUX_DEFAULT@ "
+
+:menu
+    target = @zipldir@
+    timeout = 16
+    default = 1
+    prompt = 0
+    1 = grub2
+    2 = skip-grub2
+

@@ -1,0 +1,183 @@
+#!/bin/bash
+# ex: ts=8 sw=4 sts=4 et filetype=sh syntax=off
+
+debug=false
+TIMEOUT=300
+[ -n "$SYSROOT" ] ||
+SYSROOT=/sysroot
+[ -d $SYSROOT/boot ] || SYSROOT=
+
+sync()		{ $SYSROOT/usr/bin/sync "$@"; }
+readlink()	{ $SYSROOT/usr/bin/readlink "$@"; }
+newline()	{ echo ""; }
+verbose() {
+  local a
+  local m
+  [ -n "$*" ] || return 0
+  m="+"
+  for a in "$@"; do
+    case "$a" in
+      (*"	"*|*" "*|"") m="$m '$a'";;
+      (*)     m="$m $a";;
+    esac
+  done
+  echo "$m"
+  [ -n "$SYSROOT" -o "$1" = "chroot" ] || return 0
+  "$@"
+}
+
+SYSK="$(readlink $SYSROOT/boot/image)"
+SYSK="${SYSK#image-}"
+ZIPK="$(readlink $SYSROOT/boot/zipl/image)"
+ZIPK="${ZIPK#image-}"
+PRVK="$(readlink $SYSROOT/boot/zipl/image.prev 2> /dev/null)"
+PRVK="${PRVK#image-}"
+RUNK="$(uname -r)"
+# if /boot/zipl is not accessible ZIPK will be empty, assume running kernel
+[ -n "$ZIPK" ] || ZIPK="$RUNK"
+
+[ -n "$SYSROOT" ] || {
+  echo "$0 is not intended for interactive use!"
+  $debug ||
+  exit 0
+  ## test:
+  TIMEOUT=6
+  RUNK=110; ZIPK=110; PRVK=101; SYSK=194
+  ##RUNK=$PRVK; ZIPK=$SYSK # previous booted, newest is default
+  ##t=$ZIPK; ZIPK=$PRVK; PRVK=$t; SYSK=$PRVK  # unknown booted
+  ##ZIPK=$SYSK; PRVK="" # no update
+  ##ZIPK=$SYSK # try previous
+  echo "R=$RUNK S=$SYSK Z=$ZIPK P=$PRVK"
+  #verbose echo "a b" z
+  #verbose echo "^h	^j" ^z
+}
+
+trap newline EXIT
+
+echo -n "
+  Attention: 'grub2' failed to start the target kernel"
+
+if [ "$ZIPK" != "$RUNK" -a "$RUNK" != "$SYSK" ]; then
+  # i.e. "previous" has been selected via zipl, but it fails!?
+  [ "$RUNK" = "$PRVK" ] &&
+  echo " from previous" ||
+  echo " from unknown"
+
+  echo "  ZIPL kernel ($RUNK).  If default ($ZIPK)
+  fails as well, please contact support."
+  exit 1
+fi
+echo "."
+if [ "$ZIPK" = "$SYSK" ]; then
+  [ -z "$PRVK" ] &&
+  echo "
+  No kernel update readily available/installed.  Please contact support." ||
+  echo "
+  You may want to try the previous kernel ($PRVK) with
+  'IPL ... LOADPARM 4', as no update kernel is readily available/installed."
+  exit 1
+fi
+
+echo "
+  A newer kernel ($SYSK) is available and will be deployed
+  in $TIMEOUT seconds.  To facilitate this, the affected file-systems have
+  to be made writable, then 'grub2-install --force' needs to be run,
+  and, on success, a 'reboot' will be initiated.
+
+  Press 'c[Enter]' to interrupt, any other input will proceed... "
+
+trap interrupted=1 INT
+interrupted=0
+input=""
+read -t $TIMEOUT input
+case "$input" in
+  ([Cc]) interrupted=2 ;;
+esac
+if [ $interrupted != 0 ]; then
+  echo "
+  Automatic update cancelled..."
+  exit 1
+fi
+trap - INT
+echo "
+  Attempting automatic update..."
+
+ismounted() {
+  local mode="$1"
+  local tgt="$2"
+  local dev mp fs opts dc
+  while read dev mp fs opts dc; do
+    [ "$mp" = "$tgt" ] || continue
+    case ",$opts," in
+      (*,$mode,*) return 0;;
+    esac
+  done < /proc/mounts
+  return 1
+}
+ismp() {
+  local sysr="$1"
+  local tgt="$2"
+  local dev mp fs opts dc
+  while read dev mp fs opts dc; do
+    case "$dev" in
+      ("#"*) continue;;
+    esac
+    [ "$mp" = "$tgt" ] || continue
+    return 0
+  done < $sysr/etc/fstab
+  return 1
+}
+chroot() {
+  local tgt="$1"; shift
+  if [ -z "$tgt" ]; then
+    echo -n "+"
+    verbose "$@"
+  else
+    /usr/bin/chroot "$tgt" "$@"
+  fi
+}
+cleanup() {
+  local mp
+  echo "  # cleanup"
+  for mp in $UMOUNT; do
+    verbose chroot "$SYSROOT" umount $mp
+  done
+  for mp in $WMOUNT; do
+    verbose mount -o remount,ro $mp
+  done
+  sync; sync
+  [ -z "$EXIT" ] || echo "$EXIT"
+  echo ""
+}
+trap cleanup EXIT
+UMOUNT=""
+WMOUNT=""
+EXIT=""
+
+echo "  # prepare"
+# remount $SYSROOT{,/boot{,/zipl}} read-write
+for mp in {"",/boot{,/zipl}}; do
+  [ -n "$SYSROOT$mp" ] || continue
+  if ismounted rw $SYSROOT$mp; then
+     echo "  # $mp: already read-write: ignore"
+  elif ismounted ro $SYSROOT$mp; then
+    verbose mount -o remount,rw $SYSROOT$mp
+    WMOUNT="$SYSROOT$mp $WMOUNT"
+  elif ismp "$SYSROOT" $mp; then
+    verbose chroot "$SYSROOT" mount -w $mp || exit 1
+    UMOUNT="$mp $UMOUNT"
+  fi
+done
+if [ ! -w $SYSROOT/boot/zipl/config ]; then
+  EXIT="ERROR: $SYSROOT/boot/zipl/config not writable!  Aborting..."
+  exit 1
+fi
+echo "  # action"
+verbose chroot "$SYSROOT" grub2-zipl-setup --force
+ret=$?
+if [ $ret != 0 ]; then
+  EXIT="  # failed ($ret)"
+else
+  EXIT="  # done"
+fi
+exit $ret

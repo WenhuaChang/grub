@@ -239,3 +239,14 @@ grub_install_sgi_setup (const char *install_device,
 	imgfile, destname, NULL });
   grub_util_warn ("%s", _("You will have to set `SystemPartition' and `OSLoader' manually."));
 }
+
+void
+grub_install_zipl (const char *dest, int install, int force)
+{
+  if (grub_util_exec ((const char * []){ PACKAGE"-zipl-setup",
+	verbosity ? "-v" : "",
+	install ? "" : "--debug",
+	!force ? "" : "--force",
+	"-z", dest, NULL }))
+    grub_util_error (_("`%s' failed.\n"), PACKAGE"-zipl-setup");
+}

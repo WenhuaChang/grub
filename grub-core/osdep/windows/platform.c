@@ -424,3 +424,9 @@ grub_install_sgi_setup (const char *install_device,
 {
   grub_util_error ("%s", _("no SGI routines are available for your platform"));
 }
+
+void
+grub_install_zipl (const char *d, int i, int f)
+{
+  grub_util_error ("%s", _("no zIPL routines are available for your platform"));
+}

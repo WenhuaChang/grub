@@ -1,0 +1,19 @@
+#!/bin/bash
+# -*- mode: shell-script; indent-tabs-mode: nil; sh-basic-offset: 4; -*-
+# ex: ts=8 sw=4 sts=4 et filetype=sh
+
+# called by dracut
+check() {
+    local _arch=$(uname -m)
+    [ "$_arch" = "s390" -o "$_arch" = "s390x" ] || return 1
+    return 0
+}
+
+# called by dracut
+install() {
+    inst_hook cleanup 99 "$moddir/grub2.sh"
+    inst_multiple showconsole
+    inst_multiple mount umount chroot cat grep /usr/bin/setsid
+    #inst_multiple grub2-emu kexec
+}
+
