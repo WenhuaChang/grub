@@ -45,6 +45,12 @@
 #include <errno.h>
 #include <limits.h>
 
+#if defined(MAJOR_IN_MKDEV)
+#include <sys/mkdev.h>
+#elif defined(MAJOR_IN_SYSMACROS)
+#include <sys/sysmacros.h>
+#endif
+
 # include <sys/ioctl.h>         /* ioctl */
 # include <sys/mount.h>
 # ifndef BLKFLSBUF
