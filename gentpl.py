@@ -91,6 +91,10 @@ for i in GROUPS["softdiv"]: GROUPS["no_softdiv"].remove(i)
 GROUPS["i386_coreboot_multiboot_qemu"] = ["i386_coreboot", "i386_multiboot", "i386_qemu"]
 GROUPS["nopc"] = GRUB_PLATFORMS[:]; GROUPS["nopc"].remove("i386_pc")
 
+# x86 without efi
+GROUPS["x86_noefi"] = GROUPS["x86"][:]
+GROUPS["x86_noefi"].remove("i386_efi"); GROUPS["x86_noefi"].remove("x86_64_efi");
+
 #
 # Create platform => groups reverse map, where groups covering that
 # platform are ordered by their sizes
