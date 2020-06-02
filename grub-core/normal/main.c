@@ -282,10 +282,9 @@ grub_normal_execute (const char *config, int nested, int batch)
 #ifdef GRUB_MACHINE_IEEE1275
       int boot;
       boot = 0;
-      char *script;
+      char *script = NULL;
       char *dummy[1] = { NULL };
-      script = grub_malloc (1024);
-      if (! grub_ieee1275_cas_reboot (script))
+      if (! grub_ieee1275_cas_reboot (&script) && script)
         {
           if (! grub_script_execute_new_scope (script, 0, dummy))
             boot = 1;
