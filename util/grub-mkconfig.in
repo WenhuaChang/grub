@@ -228,6 +228,14 @@ GRUB_ACTUAL_DEFAULT="$GRUB_DEFAULT"
 
 if [ "x${GRUB_ACTUAL_DEFAULT}" = "xsaved" ] ; then GRUB_ACTUAL_DEFAULT="`"${grub_editenv}" - list | sed -n '/^saved_entry=/ s,^saved_entry=,,p'`" ; fi
 
+if [ x"${GRUB_DISTRIBUTOR}" = x ] && [ -f "${sysconfdir}/os-release" ] ; then
+    . "${sysconfdir}/os-release"
+    if echo "$NAME" | grep -q "^openSUSE Tumbleweed" ; then
+      GRUB_DISTRIBUTOR="${PRETTY_NAME}"
+    else
+      GRUB_DISTRIBUTOR="${NAME} ${VERSION}"
+    fi
+fi
 
 # These are defined in this script, export them here so that user can
 # override them.
