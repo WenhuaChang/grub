@@ -743,6 +743,10 @@ grub_util_part_to_disk (const char *os_dev, struct stat *st,
   if (! realpath (os_dev, path))
     return NULL;
 
+#ifdef __s390x__
+  return path;
+#endif
+
   if (strncmp ("/dev/", path, 5) == 0)
     {
       char *p = path + 5;
