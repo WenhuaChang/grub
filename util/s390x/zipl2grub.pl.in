@@ -384,9 +384,13 @@ while ( <IN> ) {
     } else {
       $v = "";
     }
-    if ($k eq "GRUB_DEVICE" && $v !~ /^UUID/ && ! -e $v) {
-      s{root=\@$k\@}{}g;
-      next;
+    if ($k eq "GRUB_DEVICE") {
+      if (($v !~ /^UUID/ && ! -e $v) ||
+          (exists( $C{SUSE_REMOVE_LINUX_ROOT_PARAM}) &&
+          $C{SUSE_REMOVE_LINUX_ROOT_PARAM} eq "true")) {
+        s{root=\@$k\@}{}g;
+        next;
+      }
     }
     s{\@$k\@}{$v}g;
   }

@@ -74,7 +74,7 @@ case x"$GRUB_FS" in
 	else
 	rootsubvol="`make_system_path_relative_to_its_root /`"
 	rootsubvol="${rootsubvol#/}"
-	if [ "x${rootsubvol}" != x ]; then
+	if [ "x${rootsubvol}" != x ] && [ "x$SUSE_REMOVE_LINUX_ROOT_PARAM" != "xtrue" ]; then
 	    GRUB_CMDLINE_LINUX="rootflags=subvol=${rootsubvol} ${GRUB_CMDLINE_LINUX}"
 	fi
 	fi;;
@@ -84,6 +84,10 @@ case x"$GRUB_FS" in
 	LINUX_ROOT_DEVICE="ZFS=${rpool}${bootfs%/}"
 	;;
 esac
+
+if [ "x$SUSE_REMOVE_LINUX_ROOT_PARAM" = "xtrue" ]; then
+  LINUX_ROOT_DEVICE=""
+fi
 
 title_correction_code=
 
