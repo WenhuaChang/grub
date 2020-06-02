@@ -293,7 +293,8 @@ export GRUB_DEFAULT \
   GRUB_OS_PROBER_SKIP_LIST \
   GRUB_DISABLE_SUBMENU \
   GRUB_CMDLINE_LINUX_RECOVERY \
-  GRUB_USE_LINUXEFI
+  GRUB_USE_LINUXEFI \
+  SUSE_BTRFS_SNAPSHOT_BOOTING
 
 if test "x${grub_cfg}" != "x"; then
   rm -f "${grub_cfg}.new"
