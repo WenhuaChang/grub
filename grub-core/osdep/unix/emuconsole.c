@@ -50,13 +50,12 @@ static struct termios new_tty;
 static int console_mode = 0;
 
 #define MAX_LEN 1023
-#if defined(__s390x__)
+
 static int
 dummy (void)
 {
   return 0;
 }
-#endif
 #if 0
 static char msg[MAX_LEN+1];
 static  void
@@ -128,6 +127,7 @@ readkey (struct grub_term_input *term)
   return -1;
 }
 
+#if defined(__s390x__)
 #define NO_KEY	((grub_uint8_t)-1)
 static int
 readkey_dumb (struct grub_term_input *term)
@@ -158,6 +158,7 @@ readkey_dumb (struct grub_term_input *term)
     p = c;
   return c;
 }
+#endif
 
 static void
 grub_dumb_putchar (struct grub_term_output *term,
