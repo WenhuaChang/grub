@@ -234,7 +234,7 @@ version_test_numeric ()
     version_test_numeric_a="$version_test_numeric_b"
     version_test_numeric_b="$version_test_numeric_c"
   fi
-  if (echo "$version_test_numeric_a" ; echo "$version_test_numeric_b") | version_sort | head -n 1 | grep -qx "$version_test_numeric_b" ; then
+  if [ "`printf '%s\n' "$version_test_gt_a" "$version_test_gt_b" | /usr/lib/rpm/rpmsort -r | head -n1`" = "$version_test_gt_a" ] ; then
     return 0
   else
     return 1
