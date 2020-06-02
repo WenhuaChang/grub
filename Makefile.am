@@ -42,8 +42,11 @@ libgrub.pp: config-util.h grub_script.tab.h grub_script.yy.h $(libgrubmods_a_SOU
 	  -D'GRUB_MOD_INIT(x)=@MARKER@x@' $^ > $@ || (rm -f $@; exit 1)
 CLEANFILES += libgrub.pp
 
+# the grep/sed ensures that ext2 gets initialized before minix*
+# see https://savannah.gnu.org/bugs/?57652
 libgrub_a_init.lst: libgrub.pp
 	cat $< | grep '@MARKER@' | sed 's/@MARKER@\(.*\)@/\1/g' | sort -u > $@ || (rm -f $@; exit 1)
+	if grep ^ext2 $@ >/dev/null; then sed '/ext2/d;/newc/iext2' < $@ > $@.tmp && mv $@.tmp $@; fi
 CLEANFILES += libgrub_a_init.lst
 
 libgrub_a_init.c: libgrub_a_init.lst $(top_srcdir)/geninit.sh
