@@ -105,6 +105,13 @@ sysfs_partition_path (const char *dev, const char *entry)
   char *buf = NULL;
   size_t len = 0;
   char *path = NULL;
+  struct stat st;
+  int ret;
+
+  ret = stat(dev, &st);
+  if (ret == 0 && S_ISBLK(st.st_mode))
+    return xasprintf ("/sys/dev/block/%u:%u/%s",
+		      major (st.st_rdev), minor (st.st_rdev), entry);
 
   argv[0] = "udevadm";
   argv[1] = "info";
