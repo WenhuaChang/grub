@@ -212,7 +212,17 @@ grub_menu_execute_entry(grub_menu_entry_t entry, int auto_boot)
   grub_size_t sz = 0;
 
   if (entry->restricted)
-    err = grub_auth_check_authentication (entry->users);
+    {
+      int auth_check = 1;
+      if (entry->users && entry->users[0] == 0)
+	{
+	  const char *unr = grub_env_get ("unrestricted_menu");
+	  if (unr && (unr[0] == '1' || unr[0] == 'y'))
+	    auth_check = 0;
+	}
+      if (auth_check)
+	err = grub_auth_check_authentication (entry->users);
+    }
 
   if (err)
     {
