@@ -384,6 +384,10 @@ while ( <IN> ) {
     } else {
       $v = "";
     }
+    if ($k eq "GRUB_DEVICE" && $v !~ /^UUID/ && ! -e $v) {
+      s{root=\@$k\@}{}g;
+      next;
+    }
     s{\@$k\@}{$v}g;
   }
   Info( 3, $_);
