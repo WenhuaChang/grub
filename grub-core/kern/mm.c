@@ -60,14 +60,10 @@
 
 #include <config.h>
 #include <grub/mm.h>
-#include <grub/misc.h>
-#include <grub/err.h>
 #include <grub/types.h>
 #include <grub/disk.h>
 #include <grub/dl.h>
-#include <grub/i18n.h>
 #include <grub/mm_private.h>
-#include <grub/safemath.h>
 
 #ifdef MM_DEBUG
 # undef grub_calloc
@@ -375,30 +371,6 @@ grub_memalign (grub_size_t align, grub_size_t size)
  fail:
   grub_error (GRUB_ERR_OUT_OF_MEMORY, N_("out of memory"));
   return 0;
-}
-
-/*
- * Allocate NMEMB instances of SIZE bytes and return the pointer, or error on
- * integer overflow.
- */
-void *
-grub_calloc (grub_size_t nmemb, grub_size_t size)
-{
-  void *ret;
-  grub_size_t sz = 0;
-
-  if (grub_mul (nmemb, size, &sz))
-    {
-      grub_error (GRUB_ERR_OUT_OF_RANGE, N_("overflow is detected"));
-      return NULL;
-    }
-
-  ret = grub_memalign (0, sz);
-  if (!ret)
-    return NULL;
-
-  grub_memset (ret, 0, sz);
-  return ret;
 }
 
 /* Allocate SIZE bytes and return the pointer.  */

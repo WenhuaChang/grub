@@ -29,13 +29,43 @@
 #endif
 
 void grub_mm_init_region (void *addr, grub_size_t size);
-void *EXPORT_FUNC(grub_calloc) (grub_size_t nmemb, grub_size_t size);
 void *EXPORT_FUNC(grub_malloc) (grub_size_t size);
 void *EXPORT_FUNC(grub_zalloc) (grub_size_t size);
 void EXPORT_FUNC(grub_free) (void *ptr);
 void *EXPORT_FUNC(grub_realloc) (void *ptr, grub_size_t size);
 #ifndef GRUB_MACHINE_EMU
 void *EXPORT_FUNC(grub_memalign) (grub_size_t align, grub_size_t size);
+#endif
+#if !defined(GRUB_UTIL) && !defined (GRUB_MACHINE_EMU)
+#include <grub/misc.h>
+#include <grub/err.h>
+#include <grub/i18n.h>
+#include <grub/safemath.h>
+/*
+ * Allocate NMEMB instances of SIZE bytes and return the pointer, or error on
+ * integer overflow.
+ */
+static inline void *
+grub_calloc (grub_size_t nmemb, grub_size_t size)
+{
+  void *ret;
+  grub_size_t sz = 0;
+
+  if (grub_mul (nmemb, size, &sz))
+    {
+      grub_error (GRUB_ERR_OUT_OF_RANGE, N_("overflow is detected"));
+      return NULL;
+    }
+
+  ret = grub_memalign (0, sz);
+  if (!ret)
+    return NULL;
+
+  grub_memset (ret, 0, sz);
+  return ret;
+}
+#else
+void *EXPORT_FUNC(grub_calloc) (grub_size_t nmemb, grub_size_t size);
 #endif
 
 void grub_mm_check_real (const char *file, int line);
