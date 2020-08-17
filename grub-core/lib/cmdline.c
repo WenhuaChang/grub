@@ -19,6 +19,9 @@
 
 #include <grub/lib/cmdline.h>
 #include <grub/misc.h>
+#include <grub/dl.h>
+
+GRUB_MOD_LICENSE ("GPLv3+");
 
 static unsigned int check_arg (char *c, int *has_space)
 {
