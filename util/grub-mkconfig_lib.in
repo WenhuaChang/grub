@@ -49,7 +49,8 @@ grub_warn ()
 
 make_system_path_relative_to_its_root ()
 {
-  if [ "x${SUSE_BTRFS_SNAPSHOT_BOOTING}" = "xtrue" ] ; then
+  if [ "x${SUSE_BTRFS_SNAPSHOT_BOOTING}" = "xtrue" ] &&
+     [ "x${GRUB_FS}" = "xbtrfs" ] ; then
   "${grub_mkrelpath}" -r "$1"
   else
   "${grub_mkrelpath}" "$1"

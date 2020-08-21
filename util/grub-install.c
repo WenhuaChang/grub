@@ -870,6 +870,7 @@ main (int argc, char *argv[])
   const char *efi_file = NULL;
   char **grub_devices;
   grub_fs_t grub_fs;
+  grub_fs_t root_fs;
   grub_device_t grub_dev = NULL;
   enum grub_install_plat platform;
   char *grubdir, *device_map;
@@ -882,6 +883,8 @@ main (int argc, char *argv[])
   int efidir_is_mac = 0;
   int is_prep = 0;
   const char *pkgdatadir;
+  char *rootdir_path;
+  char **rootdir_devices;
 
   grub_util_host_init (&argc, &argv);
   product_version = xstrdup (PACKAGE_VERSION);
@@ -894,9 +897,6 @@ main (int argc, char *argv[])
     grub_env_set ("debug", "all");
 
   grub_util_load_config (&config);
-
-  if (config.is_suse_btrfs_snapshot_enabled)
-    use_relative_path_on_btrfs = 1;
 
   if (!bootloader_id && config.grub_distributor)
     {
@@ -1045,6 +1045,45 @@ main (int argc, char *argv[])
   grub_gcry_init_all ();
   grub_hostfs_init ();
   grub_host_init ();
+
+  {
+    char *rootdir_grub_devname;
+    grub_device_t rootdir_grub_dev;
+    char *t = grub_util_path_concat (2, "/", rootdir);
+
+    rootdir_path = grub_canonicalize_file_name (t);
+    if (!rootdir_path)
+      grub_util_error (_("failed to get canonical path of `%s'"), t);
+
+    rootdir_devices = grub_guess_root_devices (rootdir_path);
+    if (!rootdir_devices || !rootdir_devices[0])
+      grub_util_error (_("cannot find a device for %s (is /dev mounted?)"),
+		      rootdir_path);
+
+    for (curdev = rootdir_devices; *curdev; curdev++)
+	grub_util_pull_device (*curdev);
+
+    rootdir_grub_devname = grub_util_get_grub_dev (rootdir_devices[0]);
+    if (!rootdir_grub_devname)
+      grub_util_error (_("cannot find a GRUB drive for %s.  Check your device.map"),
+		       rootdir_devices[0]);
+
+    rootdir_grub_dev = grub_device_open (rootdir_grub_devname);
+    if (! rootdir_grub_dev)
+      grub_util_error ("%s", grub_errmsg);
+
+    root_fs = grub_fs_probe (rootdir_grub_dev);
+    if (!root_fs)
+      grub_util_error ("%s", grub_errmsg);
+
+    if (config.is_suse_btrfs_snapshot_enabled
+	&& grub_strncmp(root_fs->name, "btrfs", sizeof ("btrfs") - 1) == 0)
+      use_relative_path_on_btrfs = 1;
+
+    free (t);
+    free (rootdir_grub_devname);
+    grub_device_close (rootdir_grub_dev);
+  }
 
   switch (platform)
     {
@@ -1410,8 +1449,7 @@ main (int argc, char *argv[])
 	      debug_image);
     }
 
-  if (config.is_suse_btrfs_snapshot_enabled
-      && grub_strncmp(grub_fs->name, "btrfs", sizeof ("btrfs") - 1) == 0)
+  if (use_relative_path_on_btrfs)
     {
       if (!load_cfg_f)
         load_cfg_f = grub_util_fopen (load_cfg, "wb");
@@ -1624,21 +1662,13 @@ main (int argc, char *argv[])
 
 #ifdef __linux__
 
-  if (config.is_suse_btrfs_snapshot_enabled
-      && grub_strncmp(grub_fs->name, "btrfs", sizeof ("btrfs") - 1) == 0)
+  if (use_relative_path_on_btrfs)
     {
       char *subvol = NULL;
       char *mount_path = NULL;
-      char **rootdir_devices = NULL;
-      char *t = grub_util_path_concat (2, "/", rootdir);
-      char *rootdir_path = grub_canonicalize_file_name (t);
 
-      if (rootdir_path && grub_util_is_directory (rootdir_path))
-	rootdir_devices = grub_guess_root_devices (rootdir_path);
-
-      if (rootdir_devices && rootdir_devices[0])
-	if (grub_strcmp (rootdir_devices[0], grub_devices[0]) == 0)
-	  subvol = grub_util_get_btrfs_subvol (platdir, &mount_path);
+      if (grub_strcmp (rootdir_devices[0], grub_devices[0]) == 0)
+	subvol = grub_util_get_btrfs_subvol (platdir, &mount_path);
 
       if (subvol && mount_path)
 	{
@@ -1663,11 +1693,6 @@ main (int argc, char *argv[])
 	    }
 	}
 
-      free (t);
-      free (rootdir_path);
-      for (curdev = rootdir_devices; *curdev; curdev++)
-	free (*curdev);
-      free (rootdir_devices);
       free (subvol);
       free (mount_path);
     }
