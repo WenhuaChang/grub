@@ -35,3 +35,6 @@ fi
 
 # Print all undefined symbols used by module
 @TARGET_NM@ -u @TARGET_NMFLAGS_MINUS_P@ -p $module | sed "s@^\([^ ]*\).*@undefined $modname \1@g"
+
+# Specify linuxefi module should load default linux
+test "$modname" = "linuxefi" && echo "undefined $modname grub_initrd_init" || true
