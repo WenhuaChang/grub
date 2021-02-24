@@ -78,6 +78,7 @@ grub_register_command_prio (const char *name,
   return cmd;
 }
 
+#ifdef GRUB_MACHINE_EFI
 static grub_err_t
 grub_cmd_lockdown (grub_command_t cmd __attribute__ ((unused)),
                    int argc __attribute__ ((unused)),
@@ -100,6 +101,7 @@ grub_register_command_lockdown (const char *name,
 
   return grub_register_command_prio (name, func, summary, description, 0);
 }
+#endif
 
 void
 grub_unregister_command (grub_command_t cmd)

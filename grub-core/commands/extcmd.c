@@ -111,6 +111,7 @@ grub_register_extcmd (const char *name, grub_extcmd_func_t func,
 				    summary, description, parser, 1);
 }
 
+#ifdef GRUB_MACHINE_EFI
 static grub_err_t
 grub_extcmd_lockdown (grub_extcmd_context_t ctxt __attribute__ ((unused)),
                       int argc __attribute__ ((unused)),
@@ -132,6 +133,7 @@ grub_register_extcmd_lockdown (const char *name, grub_extcmd_func_t func,
 
   return grub_register_extcmd (name, func, flags, summary, description, parser);
 }
+#endif
 
 void
 grub_unregister_extcmd (grub_extcmd_t ext)

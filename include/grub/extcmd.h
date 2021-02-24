@@ -62,12 +62,25 @@ grub_extcmd_t EXPORT_FUNC(grub_register_extcmd) (const char *name,
 						 const char *description,
 						 const struct grub_arg_option *parser);
 
+#ifdef GRUB_MACHINE_EFI
 grub_extcmd_t EXPORT_FUNC(grub_register_extcmd_lockdown) (const char *name,
                                                           grub_extcmd_func_t func,
                                                           grub_command_flags_t flags,
                                                           const char *summary,
                                                           const char *description,
                                                           const struct grub_arg_option *parser);
+#else
+static inline grub_extcmd_t
+grub_register_extcmd_lockdown (const char *name,
+                               grub_extcmd_func_t func,
+                               grub_command_flags_t flags,
+                               const char *summary,
+                               const char *description,
+                               const struct grub_arg_option *parser)
+{
+  return grub_register_extcmd (name, func, flags, summary, description, parser);
+}
+#endif
 
 grub_extcmd_t EXPORT_FUNC(grub_register_extcmd_prio) (const char *name,
 						      grub_extcmd_func_t func,
