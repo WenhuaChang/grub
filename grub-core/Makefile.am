@@ -93,7 +93,9 @@ KERNEL_HEADER_FILES += $(top_srcdir)/include/grub/partition.h
 KERNEL_HEADER_FILES += $(top_srcdir)/include/grub/stack_protector.h
 KERNEL_HEADER_FILES += $(top_srcdir)/include/grub/term.h
 KERNEL_HEADER_FILES += $(top_srcdir)/include/grub/time.h
+if COND_NOT_i386_pc
 KERNEL_HEADER_FILES += $(top_srcdir)/include/grub/verify.h
+endif
 KERNEL_HEADER_FILES += $(top_srcdir)/include/grub/mm_private.h
 KERNEL_HEADER_FILES += $(top_srcdir)/include/grub/net.h
 KERNEL_HEADER_FILES += $(top_srcdir)/include/grub/memory.h
