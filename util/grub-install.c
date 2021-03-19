@@ -885,6 +885,7 @@ main (int argc, char *argv[])
   const char *pkgdatadir;
   char *rootdir_path;
   char **rootdir_devices;
+  char *efidir_root;
 
   grub_util_host_init (&argc, &argv);
   product_version = xstrdup (PACKAGE_VERSION);
@@ -1142,6 +1143,7 @@ main (int argc, char *argv[])
 	}
       if (!efidir)
 	grub_util_error ("%s", _("cannot find EFI directory"));
+      efidir_root = grub_strdup (efidir);
       efidir_device_names = grub_guess_root_devices (efidir);
       if (!efidir_device_names || !efidir_device_names[0])
 	grub_util_error (_("cannot find a device for %s (is /dev mounted?)"),
@@ -2170,6 +2172,23 @@ main (int argc, char *argv[])
 	    free (grub_efi_cfg);
 	  }
       }
+      if (!removable)
+	{
+	  const char *f;
+
+	  f = grub_install_efi_removable_fallback (efidir_root, platform);
+	  if (f)
+	    {
+	      char *t = grub_util_path_concat (3, efidir_root, "EFI", "BOOT");
+	      char *dst = grub_util_path_concat (2, t, f);
+
+	      grub_install_mkdir_p (t);
+	      fprintf (stderr, _("Install to %s as fallback.\n"), dst);
+	      grub_install_copy_file (imgfile, dst, 1);
+	      grub_free (t);
+	      grub_free (dst);
+	    }
+	}
       if (!removable && update_nvram)
 	{
 	  char * efifile_path;

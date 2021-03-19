@@ -670,6 +670,7 @@ program = {
   common = grub-core/kern/emu/argp_common.c;
   common = grub-core/osdep/init.c;
   common = grub-core/osdep/journaled_fs.c;
+  common = grub-core/osdep/efi_removable_fallback.c;
 
   ldadd = '$(LIBLZMA)';
   ldadd = libgrubmods.a;
